@@ -13,12 +13,16 @@ namespace Client_CS
 {
     class Program
     {
+        private const int TaskCount = 500;
+        private static ParallelOptions parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 50 };
+
         static async Task Main()
         {
             GrpcClientFactory.AllowUnencryptedHttp2 = true;
 
             //await Test();
             await Task.Run(TestMultipleConcurrentTasks);
+            await Task.Run(TestMultipleConcurrentTasksReusingGrpcChannel);
 
             Console.WriteLine("Press [Enter] to exit");
             Console.ReadLine();
@@ -51,24 +55,39 @@ namespace Client_CS
 
         static void TestMultipleConcurrentTasks()
         {
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasks)} {TaskCount} tasks");
+            
+            var stopwatch = Stopwatch.StartNew();
+            Parallel.For(0, TaskCount, parallelOptions, (i) =>
+            {
+                Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                using var http = GrpcChannel.ForAddress("http://localhost:10042");
+                var calculator = http.CreateGrpcService<ICalculator>();
+                var result = calculator.GetTime();
+                Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
+            });
+            stopwatch.Stop();
+
+            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasks)} for {TaskCount} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+
+        }
+
+        static void TestMultipleConcurrentTasksReusingGrpcChannel()
+        {
             using var http = GrpcChannel.ForAddress("http://localhost:10042");
             var calculator = http.CreateGrpcService<ICalculator>();
 
-            var pingTasks = new Task[1000];
-            Console.WriteLine($"{DateTime.Now} - Starting {pingTasks.Length} tasks");
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} {TaskCount} tasks");
             var stopwatch = Stopwatch.StartNew();
-            for (var i = 0; i < pingTasks.Length; i++)
+            Parallel.For(0, TaskCount, parallelOptions, (i) =>
             {
-                pingTasks[i] = Task.Factory.StartNew(() =>
-                {
-                    var result = calculator.GetTime();
-                    Console.WriteLine($"{DateTime.Now} - Result {result}");
-                });
-            }
-            Task.WaitAll(pingTasks);
+                Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                var result = calculator.GetTime();
+                Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
+            });
             stopwatch.Stop();
 
-            Console.WriteLine($"{DateTime.Now} - Ping for {pingTasks.Length} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} for {TaskCount} tasks took: {stopwatch.ElapsedMilliseconds}ms");
 
         }
     }
