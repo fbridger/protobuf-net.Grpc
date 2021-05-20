@@ -13,22 +13,25 @@ namespace Client_CS
 {
     class Program
     {
-        private const int TaskCount = 500;
+        private const int TotalRequests = 100;
+        private const bool LogDetails = false;
         private static ParallelOptions parallelOptions = new ParallelOptions() { MaxDegreeOfParallelism = 50 };
 
-        static async Task Main()
+        static void Main()
         {
             GrpcClientFactory.AllowUnencryptedHttp2 = true;
 
-            //await Test();
-            await Task.Run(TestMultipleConcurrentTasks);
-            await Task.Run(TestMultipleConcurrentTasksReusingGrpcChannel);
+            Test();
+            TestReusingGrpcChannel();
+            TestMultipleConcurrentTasks();
+            TestMultipleConcurrentTasksReusingGrpcChannel();
+            //CallGrpc().Wait();
 
             Console.WriteLine("Press [Enter] to exit");
             Console.ReadLine();
         }
 
-        static async Task Test()
+        static async Task CallGrpc()
         {
             using var http = GrpcChannel.ForAddress("http://localhost:10042");
             var calculator = http.CreateGrpcService<ICalculator>();
@@ -53,22 +56,62 @@ namespace Client_CS
             catch (OperationCanceledException) { }
         }
 
-        static void TestMultipleConcurrentTasks()
+        static void Test()
         {
-            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasks)} {TaskCount} tasks");
-            
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(Test)} {TotalRequests} tasks");
+
             var stopwatch = Stopwatch.StartNew();
-            Parallel.For(0, TaskCount, parallelOptions, (i) =>
+            for (int i = 0; i < TotalRequests; i++)
             {
-                Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Start task {i}");
                 using var http = GrpcChannel.ForAddress("http://localhost:10042");
                 var calculator = http.CreateGrpcService<ICalculator>();
                 var result = calculator.GetTime();
-                Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - End task {i}: {result}");
+
+            }
+            stopwatch.Stop();
+
+            Console.WriteLine($"{DateTime.Now} - {nameof(Test)} for {TotalRequests} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+
+        }
+
+        static void TestReusingGrpcChannel()
+        {
+            using var http = GrpcChannel.ForAddress("http://localhost:10042");
+            var calculator = http.CreateGrpcService<ICalculator>();
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestReusingGrpcChannel)} {TotalRequests} tasks");
+
+            var stopwatch = Stopwatch.StartNew();
+            for (int i = 0; i < TotalRequests; i++)
+            {
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                var result = calculator.GetTime();
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - End task {i}: {result}");
+
+            }
+            stopwatch.Stop();
+
+            Console.WriteLine($"{DateTime.Now} - {nameof(TestReusingGrpcChannel)} for {TotalRequests} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+
+        }
+
+        static void TestMultipleConcurrentTasks()
+        {
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasks)} {TotalRequests} tasks");
+            
+            var stopwatch = Stopwatch.StartNew();
+            Parallel.For(0, TotalRequests, parallelOptions, (i) =>
+            {
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                using var http = GrpcChannel.ForAddress("http://localhost:10042");
+                var calculator = http.CreateGrpcService<ICalculator>();
+                var result = calculator.GetTime();
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
             });
             stopwatch.Stop();
 
-            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasks)} for {TaskCount} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasks)} for {TotalRequests} tasks took: {stopwatch.ElapsedMilliseconds}ms");
 
         }
 
@@ -77,17 +120,17 @@ namespace Client_CS
             using var http = GrpcChannel.ForAddress("http://localhost:10042");
             var calculator = http.CreateGrpcService<ICalculator>();
 
-            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} {TaskCount} tasks");
+            Console.WriteLine($"{DateTime.Now} - Starting {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} {TotalRequests} tasks");
             var stopwatch = Stopwatch.StartNew();
-            Parallel.For(0, TaskCount, parallelOptions, (i) =>
+            Parallel.For(0, TotalRequests, parallelOptions, (i) =>
             {
-                Console.WriteLine($"{DateTime.Now} - Start task {i}");
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Start task {i}");
                 var result = calculator.GetTime();
-                Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
+                if (LogDetails) Console.WriteLine($"{DateTime.Now} - Result task {i} {result.Time}");
             });
             stopwatch.Stop();
 
-            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} for {TaskCount} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+            Console.WriteLine($"{DateTime.Now} - {nameof(TestMultipleConcurrentTasksReusingGrpcChannel)} for {TotalRequests} tasks took: {stopwatch.ElapsedMilliseconds}ms");
 
         }
     }
