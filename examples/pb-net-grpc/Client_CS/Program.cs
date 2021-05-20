@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Grpc.Core;
@@ -15,6 +16,16 @@ namespace Client_CS
         static async Task Main()
         {
             GrpcClientFactory.AllowUnencryptedHttp2 = true;
+
+            //await Test();
+            await Task.Run(TestMultipleConcurrentTasks);
+
+            Console.WriteLine("Press [Enter] to exit");
+            Console.ReadLine();
+        }
+
+        static async Task Test()
+        {
             using var http = GrpcChannel.ForAddress("http://localhost:10042");
             var calculator = http.CreateGrpcService<ICalculator>();
             var result = await calculator.MultiplyAsync(new MultiplyRequest { X = 12, Y = 4 });
@@ -36,8 +47,29 @@ namespace Client_CS
             }
             catch (RpcException ex) { Console.WriteLine(ex); }
             catch (OperationCanceledException) { }
-            Console.WriteLine("Press [Enter] to exit");
-            Console.ReadLine();
+        }
+
+        static void TestMultipleConcurrentTasks()
+        {
+            using var http = GrpcChannel.ForAddress("http://localhost:10042");
+            var calculator = http.CreateGrpcService<ICalculator>();
+
+            var pingTasks = new Task[1000];
+            Console.WriteLine($"{DateTime.Now} - Starting {pingTasks.Length} tasks");
+            var stopwatch = Stopwatch.StartNew();
+            for (var i = 0; i < pingTasks.Length; i++)
+            {
+                pingTasks[i] = Task.Factory.StartNew(() =>
+                {
+                    var result = calculator.GetTime();
+                    Console.WriteLine($"{DateTime.Now} - Result {result}");
+                });
+            }
+            Task.WaitAll(pingTasks);
+            stopwatch.Stop();
+
+            Console.WriteLine($"{DateTime.Now} - Ping for {pingTasks.Length} tasks took: {stopwatch.ElapsedMilliseconds}ms");
+
         }
     }
 }

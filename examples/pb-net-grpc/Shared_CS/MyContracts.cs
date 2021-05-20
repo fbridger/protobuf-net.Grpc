@@ -1,4 +1,5 @@
-﻿using System.Runtime.Serialization;
+﻿using MegaCorp;
+using System.Runtime.Serialization;
 using System.ServiceModel;
 using System.Threading.Tasks;
 namespace Shared_CS
@@ -7,6 +8,7 @@ namespace Shared_CS
     public interface ICalculator
     {
         ValueTask<MultiplyResult> MultiplyAsync(MultiplyRequest request);
+        TimeResult GetTime();
     }
 
     [DataContract]
